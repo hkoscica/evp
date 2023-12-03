@@ -11,6 +11,6 @@ Repozitorij sadrži:
   <li>Export APEX aplikacije</li>
 </ul>
 
-Aplikacija je razvijana na slijedećim verzijama okruženja:
+<p>Aplikacija je razvijana na slijedećim verzijama okruženja:
 APEX verzija: 23.1.5
-ORACLE DB verzija: 19c
+ORACLE DB verzija: 19c</p>
