@@ -7,6 +7,7 @@ Podaci korišteni u aplikaciju su generirani pseudo slučajnim generatorom i nem
 
 Repozitorij sadrži:
 <ul>
+  <li>Logički i relacijski model</li>
   <li>Skriptu za kreiranje objekata na bazi te za inicijalizaciju podataka</li>
   <li>Export APEX aplikacije</li>
 </ul>
