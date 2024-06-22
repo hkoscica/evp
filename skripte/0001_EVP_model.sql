@@ -1140,6 +1140,11 @@ exception
     raise_application_error (-20001, sqlerrm);
 end;
 /
+--dodano 03.04.2024. owner više nije mandatory
+alter table wksp_evp.evp_vehicle
+  modify owner_id null;
+
+/
 
 
 --DDL
@@ -1737,6 +1742,7 @@ exception
   then
     raise_application_error (-20001, sqlerrm);
 end;
+
 /
 
 /* Formatted on 11/11/2023/ 9:38:14 (QP5 v5.391) */
@@ -1811,9 +1817,11 @@ exception
     raise_application_error (-20001, sqlerrm);
 end;
 /
+--dodano 05.04.2024. owner više nije mandatory
+alter table wksp_evp.evp_vehicle_history
+  modify owner_id null;
 
-
-
+/
 
 
 
@@ -2160,3 +2168,1878 @@ as
                  and csp.flc_year = tre.tre_year
                  and nvl (csp.flc_month, 0) = nvl (tre.tre_month, 0)
                  and nvl (csp.flc_quarter, 0) = nvl (tre.tre_quarter, 0);
+
+
+/
+--DDL
+--evp_employee
+CREATE TABLE wksp_evp.evp_employee (
+    id           NUMBER NOT NULL,
+    oib          CHAR(11 CHAR) NOT NULL,
+    name         VARCHAR2(100 CHAR) NOT NULL,
+    lastname     VARCHAR2(100 CHAR) NOT NULL,
+    address      VARCHAR2(4000 CHAR),
+    apex_user_id NUMBER,
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_employee IS
+    'Employee';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.id IS
+    'Employee  ID';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.oib IS
+    'OIB';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.name IS
+    'Firstname';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.lastname IS
+    'Lastname';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.address IS
+    'Employee  address';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.apex_user_id IS
+    'apex_appl_acl_users ID';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.date_updated IS
+    'Updated date';
+
+ALTER TABLE wksp_evp.evp_employee ADD CONSTRAINT evp_employee_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_employee ADD CONSTRAINT emp_acl_un UNIQUE ( apex_user_id );
+
+create or replace trigger wksp_evp.evp_trg_emp_biu
+  before insert or update
+  on wksp_evp.evp_employee
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+/
+
+
+--DDL
+--evp_technical_inspection
+CREATE TABLE wksp_evp.evp_technical_inspection (
+    id           NUMBER NOT NULL,
+    valid_from   DATE NOT NULL,
+    valid_to     DATE NOT NULL,
+    vehicle_id   NUMBER NOT NULL,
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_technical_inspection IS
+    'Vehicle technical inspection';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.id IS
+    'Technical inspection ID';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.valid_from IS
+    'Inspection valid from';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.valid_to IS
+    'Inspection valid to';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.vehicle_id IS
+    'Vehicle FK';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_technical_inspection.date_updated IS
+    'Updated date';
+
+CREATE INDEX wksp_evp.evp_tin_vehicle_idx ON
+    wksp_evp.evp_technical_inspection (
+        vehicle_id
+    ASC );
+
+ALTER TABLE wksp_evp.evp_technical_inspection ADD CONSTRAINT evp_technical_inspection_pk PRIMARY KEY ( id );
+
+create or replace trigger wksp_evp.evp_trg_tin_biu
+  before insert or update
+  on wksp_evp.evp_technical_inspection
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+/
+
+--DDL
+--evp_vehicle_registration
+CREATE TABLE wksp_evp.evp_vehicle_registration (
+    id           NUMBER NOT NULL,
+    valid_from   DATE NOT NULL,
+    valid_to     DATE NOT NULL,
+    vehicle_id   NUMBER NOT NULL,
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_vehicle_registration IS
+    'Vehicle registration';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.id IS
+    'Vehicle registration ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.valid_from IS
+    'Registration valid from';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.valid_to IS
+    'Registration valid to';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.vehicle_id IS
+    'Vehicle FK';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_registration.date_updated IS
+    'Updated date';
+
+CREATE INDEX wksp_evp.evp_ver_vehicle_idx ON
+    wksp_evp.evp_vehicle_registration (
+        vehicle_id
+    ASC );
+
+ALTER TABLE wksp_evp.evp_vehicle_registration ADD CONSTRAINT evp_vehicle_registration_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_technical_inspection
+    ADD CONSTRAINT evp_tin_vehicle_fk FOREIGN KEY ( vehicle_id )
+        REFERENCES wksp_evp.evp_vehicle ( id );
+
+ALTER TABLE wksp_evp.evp_vehicle_registration
+    ADD CONSTRAINT evp_ver_vehicle_fk FOREIGN KEY ( vehicle_id )
+        REFERENCES wksp_evp.evp_vehicle ( id );
+        
+create or replace trigger wksp_evp.evp_trg_ver_biu
+  before insert or update
+  on wksp_evp.evp_vehicle_registration
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+/
+
+--DDL
+--evp_notification_user_act
+CREATE TABLE wksp_evp.evp_notification_user_act (
+    id              NUMBER NOT NULL,
+    activity_type   VARCHAR2(50 CHAR) NOT NULL,
+    notification_id NUMBER,
+    user_crated     VARCHAR2(50 CHAR) NOT NULL,
+    date_crated     DATE NOT NULL,
+    user_updated    VARCHAR2(50 CHAR),
+    date_updated    DATE
+);
+
+ALTER TABLE wksp_evp.evp_notification_user_act
+    ADD CHECK ( activity_type IN ( 'DISMISSED', 'OPENED' ) );
+
+COMMENT ON TABLE wksp_evp.evp_notification_user_act IS
+    'Notification user activity';
+
+COMMENT ON COLUMN wksp_evp.evp_notification_user_act.id IS
+    'Notification user activity ID';
+
+COMMENT ON COLUMN wksp_evp.evp_notification_user_act.activity_type IS
+    'User activity type';
+
+COMMENT ON COLUMN wksp_evp.evp_notification_user_act.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_notification_user_act.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_notification_user_act.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_notification_user_act.date_updated IS
+    'Updated date';
+
+CREATE INDEX wksp_evp.evp_nua_ven_idx ON
+    wksp_evp.evp_notification_user_act (
+        notification_id
+    ASC );
+
+ALTER TABLE wksp_evp.evp_notification_user_act ADD CONSTRAINT evp_notification_user_act_pk PRIMARY KEY ( id,
+                                                                                                         user_crated );
+                                                                                                         
+/                                                                                                         
+create or replace trigger wksp_evp.evp_trg_nua_biu
+  before insert or update
+  on wksp_evp.evp_notification_user_act
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+
+/
+--DDL
+--evp_vehicle_notification
+CREATE TABLE wksp_evp.evp_vehicle_notification (
+    id           NUMBER NOT NULL,
+    receiver     VARCHAR2(200 CHAR) DEFAULT 'USERS' NOT NULL,
+    title        VARCHAR2(100 CHAR) NOT NULL,
+    content      VARCHAR2(500 CHAR) NOT NULL,
+    sender       VARCHAR2(200 CHAR) DEFAULT 'SYSTEM' NOT NULL,
+    metadata     CLOB NOT NULL,
+    type         VARCHAR2(50 CHAR) NOT NULL,
+    priority     VARCHAR2(50 CHAR) NOT NULL,
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+ALTER TABLE wksp_evp.evp_vehicle_notification
+    ADD CHECK ( type IN ( 'APP', 'E-MAIL' ) );
+
+ALTER TABLE wksp_evp.evp_vehicle_notification
+    ADD CHECK ( priority IN ( 'HIGH', 'LOW', 'NO', 'URGENT' ) );
+
+COMMENT ON TABLE wksp_evp.evp_vehicle_notification IS
+    'Vehicle notifications';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.id IS
+    'Notification  ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.receiver IS
+    'Receiver of notification';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.title IS
+    'Title';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.content IS
+    'Content';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.sender IS
+    'Sender of notification';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.metadata IS
+    'Metadata more about notification in json format';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.type IS
+    'Type';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.priority IS
+    'Priority';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_notification.date_updated IS
+    'Updated date';
+
+CREATE INDEX wksp_evp.evp_ven_receiver_idx ON
+    wksp_evp.evp_vehicle_notification (
+        receiver
+    ASC );
+
+ALTER TABLE wksp_evp.evp_vehicle_notification ADD CONSTRAINT evp_vehicle_notification_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_notification_user_act
+    ADD CONSTRAINT evp_nua_ven_fk FOREIGN KEY ( notification_id )
+        REFERENCES wksp_evp.evp_vehicle_notification ( id );
+        
+/
+
+create or replace trigger wksp_evp.evp_trg_ven_biu
+  before insert or update
+  on wksp_evp.evp_vehicle_notification
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+
+/
+--DDL
+--evp_settlement
+CREATE TABLE wksp_evp.evp_settlement (
+    id           NUMBER NOT NULL,
+    settlement   VARCHAR2(100 CHAR) NOT NULL,
+    postal_code  VARCHAR2(20 CHAR) NOT NULL,
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_settlement IS
+    'Settlement';
+
+COMMENT ON COLUMN wksp_evp.evp_settlement.id IS
+    'Settlement ID';
+
+COMMENT ON COLUMN wksp_evp.evp_settlement.settlement IS
+    'Settlment name';
+
+COMMENT ON COLUMN wksp_evp.evp_settlement.postal_code IS
+    'Settlement postal code';
+
+COMMENT ON COLUMN wksp_evp.evp_settlement.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_settlement.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_settlement.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_settlement.date_updated IS
+    'Updated date';
+
+ALTER TABLE wksp_evp.evp_settlement ADD CONSTRAINT evp_settlement_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_settlement ADD CONSTRAINT evp_sett_postal_un UNIQUE ( settlement,
+                                                                      postal_code );
+                                                                      
+create or replace trigger wksp_evp.evp_trg_set_biu
+  before insert or update
+  on wksp_evp.evp_settlement
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;                                                                      
+                                                                      
+/
+
+--DDL
+--evp_travelers                                                                
+CREATE TABLE wksp_evp.evp_travelers (
+    id           NUMBER NOT NULL,
+    request_id   NUMBER NOT NULL,
+    emp_id       NUMBER NOT NULL,
+    driver_ind   VARCHAR2(1 CHAR),
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+ALTER TABLE wksp_evp.evp_travelers
+    ADD CONSTRAINT evp_tra_driver_ind_ck CHECK ( driver_ind IN ( '1' ) );
+
+COMMENT ON TABLE wksp_evp.evp_travelers IS
+    'Vehicle travelers';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.id IS
+    'Traveler ID';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.request_id IS
+    'Request FK ID';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.emp_id IS
+    'Employee FK ID';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.driver_ind IS
+    'Driver indication';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_travelers.date_updated IS
+    'Updated date';
+
+CREATE INDEX evp_tra_request_idx ON
+    wksp_evp.evp_travelers (
+        request_id
+    ASC );
+
+CREATE INDEX evp_tra_employee_idx ON
+    wksp_evp.evp_travelers (
+        emp_id
+    ASC );
+
+CREATE UNIQUE INDEX evp_tra_emp_req_idx ON
+    wksp_evp.evp_travelers (
+        request_id
+    ASC,
+        emp_id
+    ASC );
+
+ALTER TABLE wksp_evp.evp_travelers ADD CONSTRAINT evp_travelers_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_travelers ADD CONSTRAINT evp_tra_req_un UNIQUE ( request_id,
+                                                                 driver_ind );
+ 
+
+create or replace trigger wksp_evp.evp_trg_tra_biu
+  before insert or update
+  on wksp_evp.evp_travelers
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+                                                                
+                                                                 
+/                                                                 
+
+--DDl
+--evp_vehicle_req_sta_history
+CREATE TABLE wksp_evp.evp_vehicle_req_sta_history (
+    id           NUMBER NOT NULL,
+    request_id   NUMBER NOT NULL,
+    status_id    NUMBER NOT NULL,
+    note         VARCHAR2(4000 CHAR),
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_vehicle_req_sta_history IS
+    'Vehicle request status history';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.id IS
+    'Status History  ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.request_id IS
+    'Request FK ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.status_id IS
+    'Status FK ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.note IS
+    'Status change note';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_req_sta_history.date_updated IS
+    'Updated date';
+
+CREATE INDEX evp_rsh_vre_idx ON
+    wksp_evp.evp_vehicle_req_sta_history (
+        request_id
+    ASC );
+
+CREATE INDEX evp_rsh_vrs_idx ON
+    wksp_evp.evp_vehicle_req_sta_history (
+        stauts_id
+    ASC );
+
+ALTER TABLE wksp_evp.evp_vehicle_req_sta_history ADD CONSTRAINT evp_rsh_pk PRIMARY KEY ( id );
+
+create or replace trigger wksp_evp.evp_trg_rsh_biu
+  before insert or update
+  on wksp_evp.evp_vehicle_req_sta_history
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+
+/
+
+--DDL
+--evp_vehicle_request
+CREATE TABLE wksp_evp.evp_vehicle_request (
+    id                 NUMBER NOT NULL,
+    reservation_code   VARCHAR2(9 CHAR),
+    travel_start_date  DATE NOT NULL,
+    travel_end_date    DATE NOT NULL,
+    settlement_from_id NUMBER NOT NULL,
+    settlement_to_id   NUMBER NOT NULL,
+    vehicle_id         NUMBER,
+    user_crated        VARCHAR2(50 CHAR) NOT NULL,
+    date_crated        DATE NOT NULL,
+    user_updated       VARCHAR2(50 CHAR),
+    date_updated       DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_vehicle_request IS
+    'Vehicle reservation request';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.id IS
+    'VEhicle request ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.reservation_code IS
+    'Reservation unique code';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.travel_start_date IS
+    'Travel start date and time';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.travel_end_date IS
+    'Travel end  date and time';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.settlement_from_id IS
+    'Settlement travel begin place FK';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.settlement_to_id IS
+    'Settlement travel destination  place FK';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.vehicle_id IS
+    'VEHICLE ID FK';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request.date_updated IS
+    'Updated date';
+
+CREATE UNIQUE INDEX evp_vre_rsrv_code_idxv1 ON
+    wksp_evp.evp_vehicle_request (
+        reservation_code
+    ASC );
+
+CREATE INDEX evp_vre_trv_from_idx ON
+    wksp_evp.evp_vehicle_request (
+        settlement_from_id
+    ASC );
+
+CREATE INDEX evp_vre_trv_to_idx ON
+    wksp_evp.evp_vehicle_request (
+        settlement_to_id
+    ASC );
+
+CREATE INDEX evp_vre_vehicle_idxv2 ON
+    wksp_evp.evp_vehicle_request (
+        vehicle_id
+    ASC );
+
+ALTER TABLE wksp_evp.evp_vehicle_request ADD CONSTRAINT evp_vehicle_request_pk PRIMARY KEY ( id );
+
+create or replace trigger wksp_evp.evp_trg_vre_biu
+  before insert or update
+  on wksp_evp.evp_vehicle_request
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+
+/
+
+--DDL
+--evp_vehicle_request_status
+CREATE TABLE wksp_evp.evp_vehicle_request_status (
+    id           NUMBER NOT NULL,
+    ref_code     VARCHAR2(50) NOT NULL,
+    status_name  VARCHAR2(100 CHAR),
+    description  VARCHAR2(4000 CHAR) NOT NULL,
+    user_crated  VARCHAR2(50 CHAR) NOT NULL,
+    date_crated  DATE NOT NULL,
+    user_updated VARCHAR2(50 CHAR),
+    date_updated DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_vehicle_request_status IS
+    'Vehicle request status';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.id IS
+    'Status  ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.ref_code IS
+    'Status  ref code';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.status_name IS
+    'Status name';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.description IS
+    'Status  description';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_request_status.date_updated IS
+    'Updated date';
+
+ALTER TABLE wksp_evp.evp_vehicle_request_status ADD CONSTRAINT evp_vehicle_request_status_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_vehicle_request_status ADD CONSTRAINT evp_vrs_ref_code_un UNIQUE ( ref_code );
+
+create or replace trigger wksp_evp.evp_trg_vrs_biu
+  before insert or update
+  on wksp_evp.evp_vehicle_request_status
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;
+
+/
+
+ALTER TABLE wksp_evp.evp_vehicle_req_sta_history
+    ADD CONSTRAINT evp_rsh_vre_fk FOREIGN KEY ( request_id )
+        REFERENCES wksp_evp.evp_vehicle_request ( id );
+
+ALTER TABLE wksp_evp.evp_vehicle_req_sta_history
+    ADD CONSTRAINT evp_rsh_vrs_fk FOREIGN KEY ( stauts_id )
+        REFERENCES wksp_evp.evp_vehicle_request_status ( id );
+
+ALTER TABLE wksp_evp.evp_travelers
+    ADD CONSTRAINT evp_tra_employee_fk FOREIGN KEY ( emp_id )
+        REFERENCES wksp_evp.evp_employee ( id );
+
+ALTER TABLE wksp_evp.evp_travelers
+    ADD CONSTRAINT evp_tra_request_fk FOREIGN KEY ( request_id )
+        REFERENCES wksp_evp.evp_vehicle_request ( id );
+
+ALTER TABLE wksp_evp.evp_vehicle_request
+    ADD CONSTRAINT evp_vre_rsh_fk FOREIGN KEY ( settlement_from_id )
+        REFERENCES wksp_evp.evp_settlement ( id );
+
+ALTER TABLE wksp_evp.evp_vehicle_request
+    ADD CONSTRAINT evp_vre_settl_dest_fk FOREIGN KEY ( settlement_to_id )
+        REFERENCES wksp_evp.evp_settlement ( id );
+
+ALTER TABLE wksp_evp.evp_vehicle_request
+    ADD CONSTRAINT evp_vre_vehicle_fk FOREIGN KEY ( vehicle_id )
+        REFERENCES wksp_evp.evp_vehicle ( id );
+        
+/
+--DDL
+--alter evp_empployee
+
+ALTER TABLE wksp_evp.evp_employee ADD(
+    hire_date    DATE NOT NULL,
+    finish_date  DATE,
+    birth_date   DATE NOT NULL
+);
+
+COMMENT ON COLUMN wksp_evp.evp_employee.hire_date IS
+    'Hire date';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.finish_date IS
+    'Finish  date';
+
+COMMENT ON COLUMN wksp_evp.evp_employee.birth_date IS
+    'Birth date';
+    
+ALTER TABLE wksp_evp.evp_employee ADD(
+    gender     VARCHAR2(1 CHAR)
+);
+    
+COMMENT ON COLUMN wksp_evp.evp_employee.gender IS
+    'Gender';
+
+/
+
+--PL/SQL insert evp_employee
+declare
+  procedure p_ins_employees (
+    p_i_oib               in wksp_evp.evp_employee.oib%type
+   ,p_i_name              in wksp_evp.evp_employee.name%type
+   ,p_i_lastname          in wksp_evp.evp_employee.lastname%type
+   ,p_i_address           in wksp_evp.evp_employee.address%type
+   ,p_i_hire              in wksp_evp.evp_employee.hire_date%type
+   ,p_i_gender            in wksp_evp.evp_employee.gender%type
+   ,p_i_birth             in wksp_evp.evp_employee.birth_date%type
+   ,p_i_job               in wksp_evp.evp_employee.job%type
+)
+  is
+    v_id  number;
+  begin
+    select max (id)
+      into v_id
+      from wksp_evp.evp_employee
+     where oib = p_i_oib;
+
+    if v_id is null
+    then
+      insert into wksp_evp.evp_employee (
+                    oib
+                   ,name
+                   ,lastname
+                   ,address
+                   ,hire_date
+                   ,gender
+                   ,birth_date
+                   ,job)
+           values (
+                    p_i_oib
+                   ,p_i_name
+                   ,p_i_lastname
+                   ,p_i_address
+                   ,p_i_hire
+                   ,p_i_gender
+                   ,p_i_birth
+                   ,p_i_job);
+    else
+      update wksp_evp.evp_employee
+         set oib = p_i_oib
+            ,name = p_i_name
+            ,lastname = p_i_lastname
+            ,address = p_i_address
+            ,hire_date = p_i_hire
+            ,birth_date = p_i_birth
+            ,gender = p_i_gender
+            ,job = p_i_job
+       where id = v_id;
+    end if;
+  end;
+begin
+    
+  p_ins_employees(p_i_job => 'Racunovoda', p_i_oib =>'89012345670', p_i_gender => 'F', p_i_name => 'Ana', p_i_lastname =>'Kovacevic', p_i_address =>'Aleja Snova i zvijezda 6, 30130 Sisak', p_i_hire =>to_date('03.08.2009', 'DD.MM.YYYY'), p_i_birth =>to_date('16.07.1991', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Programer', p_i_oib =>'09856543210', p_i_gender => 'M', p_i_name => 'Marko', p_i_lastname =>'Horvat', p_i_address =>'Promenada Nadrealnih prica 51, 40140 Bjelovar', p_i_hire =>to_date('05.08.2010', 'DD.MM.YYYY'), p_i_birth =>to_date('14.06.1989', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Programer', p_i_oib =>'76543210987', p_i_gender => 'F', p_i_name => 'Ivana', p_i_lastname =>'Babic', p_i_address =>'Avenija Beskrajnih mogucnosti 22, 50150 Crikvenica', p_i_hire =>to_date('11.09.2011', 'DD.MM.YYYY'), p_i_birth =>to_date('25.12.1988', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Direktor', p_i_oib =>'43110987654', p_i_gender => 'M', p_i_name => 'Andrej', p_i_lastname =>'Novak', p_i_address =>'Prolaz Carobnih trenutaka 17, 60160 Vukovar', p_i_hire =>to_date('29.02.2012', 'DD.MM.YYYY'), p_i_birth =>to_date('07.04.1993', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Voditelj odjela', p_i_oib =>'21098765432', p_i_gender => 'F', p_i_name => 'Petra', p_i_lastname =>'Juric', p_i_address =>'Naselje Izgubljenih iluzija 38, 70180 Makarska', p_i_hire =>to_date('22.03.2013', 'DD.MM.YYYY'), p_i_birth =>to_date('29.11.1992', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Programer', p_i_oib =>'54321098765', p_i_gender => 'M', p_i_name => 'Nikola', p_i_lastname =>'Tomic', p_i_address =>'Kvart Vrtova mašte 10, 80190 Požega', p_i_hire =>to_date('14.06.2014', 'DD.MM.YYYY'), p_i_birth =>to_date('06.10.1990', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Alatnicar', p_i_oib =>'87650123456', p_i_gender => 'F', p_i_name => 'Marija', p_i_lastname =>'Radic', p_i_address =>'Cesta Tajanstvenih voda 25, 90100 Krapina', p_i_hire =>to_date('25.08.2015', 'DD.MM.YYYY'), p_i_birth =>to_date('18.09.1994', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Mehanicar', p_i_oib =>'12340678901', p_i_gender => 'M', p_i_name => 'Luka', p_i_lastname =>'Vukovic', p_i_address =>'Ulica Raznobojnih horizonta 8, 10010 Vinkovci', p_i_hire =>to_date('09.11.2016', 'DD.MM.YYYY'), p_i_birth =>to_date('28.02.1991', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Racunovoda', p_i_oib =>'87454321098', p_i_gender => 'F', p_i_name => 'Katarina', p_i_lastname =>'Kneževic', p_i_address =>'Trg Nerealnih doživljaja 31, 20030 Županja', p_i_hire =>to_date('03.08.2017', 'DD.MM.YYYY'), p_i_birth =>to_date('01.01.1988', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Pomocnik direktora', p_i_oib =>'98765432109', p_i_gender => 'M', p_i_name => 'Ivan', p_i_lastname =>'Maras', p_i_address =>'Aleja Šarenila i cuda 14, 30070 Kutina', p_i_hire =>to_date('18.09.2018', 'DD.MM.YYYY'), p_i_birth =>to_date('23.07.1993', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Voditelj odjela', p_i_oib =>'13345098765', p_i_gender => 'F', p_i_name => 'Lea', p_i_lastname =>'Petrovic', p_i_address =>'Promenada Bezvremenih prica 49, 40080 Pakrac', p_i_hire =>to_date('07.04.2019', 'DD.MM.YYYY'), p_i_birth =>to_date('17.03.1995', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Kuhar', p_i_oib =>'65432109876', p_i_gender => 'M', p_i_name => 'David', p_i_lastname =>'Matic', p_i_address =>'Avenija Nestvarnih ljubavi 16, 50020 Novska', p_i_hire =>to_date('01.01.2020', 'DD.MM.YYYY'), p_i_birth =>to_date('30.12.1986', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Programer', p_i_oib =>'10987654321', p_i_gender => 'F', p_i_name => 'Mia', p_i_lastname =>'Peric', p_i_address =>'Prolaz Sjajnih ideja 27, 60040 Vrbovec', p_i_hire =>to_date('16.07.2021', 'DD.MM.YYYY'), p_i_birth =>to_date('11.11.1987', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Cistacica', p_i_oib =>'43210987654', p_i_gender => 'F', p_i_name => 'Matija', p_i_lastname =>'Savic', p_i_address =>'Naselje Zaboravljenih snova 19, 70060 Ðakovo', p_i_hire =>to_date('29.11.2022', 'DD.MM.YYYY'), p_i_birth =>to_date('19.05.1996', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Programer', p_i_oib =>'87654321098', p_i_gender => 'F', p_i_name => 'Ema', p_i_lastname =>'Šimic', p_i_address =>'Kvart Iluzornih planina 32, 80090 Našice', p_i_hire =>to_date('23.07.2023', 'DD.MM.YYYY'), p_i_birth =>to_date('21.03.1992', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Poslovni analiticar', p_i_oib =>'09876543210', p_i_gender => 'M', p_i_name => 'Filip', p_i_lastname =>'Nemet', p_i_address =>'Cesta Nenapisanih prica 21, 90050 Križevci', p_i_hire =>to_date('17.03.2024', 'DD.MM.YYYY'), p_i_birth =>to_date('03.08.1989', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Poslovni analiticar', p_i_oib =>'56789012345', p_i_gender => 'F', p_i_name => 'Sara', p_i_lastname =>'Cvitkovic', p_i_address =>'Ulica Nestvarnih susreta 36, 10020 Ivanec', p_i_hire =>to_date('06.10.2023', 'DD.MM.YYYY'), p_i_birth =>to_date('25.08.1988', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Poslovni analiticar', p_i_oib =>'12345098765', p_i_gender => 'M', p_i_name => 'Antonio', p_i_lastname =>'Mlinaric', p_i_address =>'Trg Izmišljenih prijatelja 13, 20060 Ludbreg', p_i_hire =>to_date('21.03.2022', 'DD.MM.YYYY'), p_i_birth =>to_date('14.06.1990', 'DD.MM.YYYY'));
+  p_ins_employees(p_i_job => 'Racunovoda', p_i_oib =>'23456789012', p_i_gender => 'F', p_i_name => 'Helena', p_i_lastname =>'Vidovic', p_i_address =>'Aleja Zabranjenih svjetova 28, 30010 Prelog', p_i_hire =>to_date('01.01.2021', 'DD.MM.YYYY'), p_i_birth =>to_date('29.11.1987', 'DD.MM.YYYY'));
+
+  commit;
+exception
+  when others
+  then
+    rollback;
+    raise;
+end;
+/
+
+
+--PL/SQL insert evp_settlement
+declare
+  procedure p_ins_settlement (
+    p_i_settlement  in wksp_evp.evp_settlement.settlement%type
+   ,p_i_postal_code in wksp_evp.evp_settlement.postal_code%type)
+  is
+    v_id  number;
+  begin
+    select max (id)
+      into v_id
+      from wksp_evp.evp_settlement
+     where settlement = p_i_settlement
+       and postal_code = p_i_postal_code; 
+
+    if v_id is null
+    then
+      insert into wksp_evp.evp_settlement (
+                    settlement
+                   ,postal_code)
+           values (
+                    p_i_settlement
+                   ,p_i_postal_code);
+    else
+      null;
+    end if;
+  end;
+begin
+    
+  p_ins_settlement(p_i_settlement =>'Zagreb', p_i_postal_code => '10000');
+  p_ins_settlement(p_i_settlement =>'Split', p_i_postal_code => '21000');
+  p_ins_settlement(p_i_settlement =>'Rijeka', p_i_postal_code => '51000');
+  p_ins_settlement(p_i_settlement =>'Osijek', p_i_postal_code => '31000');
+  p_ins_settlement(p_i_settlement =>'Zadar', p_i_postal_code => '23000');
+  p_ins_settlement(p_i_settlement =>'Slavonski Brod', p_i_postal_code => '35000');
+  p_ins_settlement(p_i_settlement =>'Pula', p_i_postal_code => '52100');
+  p_ins_settlement(p_i_settlement =>'Sisak', p_i_postal_code => '44000');
+  p_ins_settlement(p_i_settlement =>'Karlovac', p_i_postal_code => '47000');
+  p_ins_settlement(p_i_settlement =>'Varaždin', p_i_postal_code => '42000');
+  p_ins_settlement(p_i_settlement =>'Šibenik', p_i_postal_code => '22000');
+  p_ins_settlement(p_i_settlement =>'Dubrovnik', p_i_postal_code => '20000');
+  p_ins_settlement(p_i_settlement =>'Porec', p_i_postal_code => '52440');
+  p_ins_settlement(p_i_settlement =>'Rovinj', p_i_postal_code => '52210');
+  p_ins_settlement(p_i_settlement =>'Vukovar', p_i_postal_code => '32000');
+  p_ins_settlement(p_i_settlement =>'Samobor', p_i_postal_code => '10430');
+  p_ins_settlement(p_i_settlement =>'Vinkovci', p_i_postal_code => '32100');
+  p_ins_settlement(p_i_settlement =>'Koprivnica', p_i_postal_code => '48000');
+  p_ins_settlement(p_i_settlement =>'Požega', p_i_postal_code => '34000');
+  p_ins_settlement(p_i_settlement =>'Bjelovar', p_i_postal_code => '43000');
+  p_ins_settlement(p_i_settlement =>'Pakrac', p_i_postal_code => '34550');
+  p_ins_settlement(p_i_settlement =>'Kutina', p_i_postal_code => '44320');
+  p_ins_settlement(p_i_settlement =>'Nova Gradiška', p_i_postal_code => '35400');
+  p_ins_settlement(p_i_settlement =>'Ðakovo', p_i_postal_code => '31400');
+  p_ins_settlement(p_i_settlement =>'Ivanic Grad', p_i_postal_code => '10310');
+  p_ins_settlement(p_i_settlement =>'Opatija', p_i_postal_code => '51410');
+  p_ins_settlement(p_i_settlement =>'Virovitica', p_i_postal_code => '33000');
+  p_ins_settlement(p_i_settlement =>'Križevci', p_i_postal_code => '48260');
+  p_ins_settlement(p_i_settlement =>'Petrinja', p_i_postal_code => '44250');
+  p_ins_settlement(p_i_settlement =>'Slatina', p_i_postal_code => '33520');
+  p_ins_settlement(p_i_settlement =>'Gospic', p_i_postal_code => '53000');
+  p_ins_settlement(p_i_settlement =>'Cakovec', p_i_postal_code => '40000');
+  p_ins_settlement(p_i_settlement =>'Vukovar', p_i_postal_code => '32000');
+  p_ins_settlement(p_i_settlement =>'Ogulin', p_i_postal_code => '47300');
+  p_ins_settlement(p_i_settlement =>'Krapina', p_i_postal_code => '49000');
+  p_ins_settlement(p_i_settlement =>'Knin', p_i_postal_code => '22300');
+  p_ins_settlement(p_i_settlement =>'Sinj', p_i_postal_code => '21230');
+  p_ins_settlement(p_i_settlement =>'Imotski', p_i_postal_code => '21260');
+  p_ins_settlement(p_i_settlement =>'Benkovac', p_i_postal_code => '23420');
+  p_ins_settlement(p_i_settlement =>'Kutjevo', p_i_postal_code => '34340');
+  p_ins_settlement(p_i_settlement =>'Otocac', p_i_postal_code => '53220');
+  p_ins_settlement(p_i_settlement =>'Ploce', p_i_postal_code => '20340');
+  p_ins_settlement(p_i_settlement =>'Zaprešic', p_i_postal_code => '10290');
+
+  
+  commit;
+exception
+  when others
+  then
+    rollback;
+    raise;
+end;
+/
+
+--DDL alter evp_employee
+
+alter table wksp_evp.evp_employee
+  add job varchar2 (100 char);
+
+comment on column wksp_evp.evp_employee.job is 'Job';
+
+--DDL alter wksp_evp.evp_travelers
+
+alter table wksp_evp.evp_travelers
+ drop constraint EVP_TRA_REQ_UN;
+ 
+ /
+ 
+ --DDL alter evp_vehicle_request_status
+/* Formatted on 23/5/2024/ 20:49:07 (QP5 v5.391) */
+alter table wksp_evp.evp_vehicle_request_status
+  add (ind_start char (1 char), ind_end char (1 char));
+
+alter table wksp_evp.evp_vehicle_request_status
+  add check (ind_start in ('0', '1'));
+
+alter table wksp_evp.evp_vehicle_request_status
+  add check (ind_end in ('0', '1'));
+
+comment on column wksp_evp.evp_vehicle_request_status.ind_start is
+  'Starting status indicator';
+
+comment on column wksp_evp.evp_vehicle_request_status.ind_end is
+  'Last status indicator';
+  
+  
+/* Formatted on 23/5/2024/ 21:02:07 (QP5 v5.391) */
+alter table wksp_evp.evp_vehicle_request_status
+  add (color_code varchar2 (50 char));
+
+comment on column wksp_evp.evp_vehicle_request_status.color_code is
+  'CSS or other color code or class';
+/
+--DDL evp_ver_status_translation
+
+CREATE TABLE wksp_evp.evp_ver_status_translation (
+    id             NUMBER NOT NULL,
+    status_id_from NUMBER NOT NULL,
+    status_id_to   NUMBER NOT NULL,
+    user_crated    VARCHAR2(50 CHAR) NOT NULL,
+    date_crated    DATE NOT NULL,
+    user_updated   VARCHAR2(50 CHAR),
+    date_updated   DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_ver_status_translation IS
+    'Vehicle request status';
+
+COMMENT ON COLUMN wksp_evp.evp_ver_status_translation.id IS
+    'Status translation  ID';
+
+COMMENT ON COLUMN wksp_evp.evp_ver_status_translation.status_id_from IS
+    'FK status id from';
+
+COMMENT ON COLUMN wksp_evp.evp_ver_status_translation.status_id_to IS
+    'FK status id to';
+
+COMMENT ON COLUMN wksp_evp.evp_ver_status_translation.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_ver_status_translation.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_ver_status_translation.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_ver_status_translation.date_updated IS
+    'Updated date';
+
+ALTER TABLE wksp_evp.evp_ver_status_translation ADD CONSTRAINT evp_ver_sta_tra_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_ver_status_translation ADD CONSTRAINT evp_ver_status_from_to_un UNIQUE ( status_id_from,
+                                                                                                  status_id_to );
+
+ALTER TABLE wksp_evp.evp_ver_status_translation
+    ADD CONSTRAINT evp_ver_vst_stat_from_fk FOREIGN KEY ( status_id_from )
+        REFERENCES wksp_evp.evp_vehicle_request_status ( id );
+
+ALTER TABLE wksp_evp.evp_ver_status_translation
+    ADD CONSTRAINT evp_ver_vst_stat_to_fk FOREIGN KEY ( status_id_to )
+        REFERENCES wksp_evp.evp_vehicle_request_status ( id );
+        
+        
+create or replace trigger wksp_evp.evp_trg_vst_biu
+  before insert or update
+  on wksp_evp.evp_ver_status_translation
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;        
+
+/
+
+--PL/SQL insert evp_vehicle_request_status & evp_ver_status_translation
+/* Formatted on 25/5/2024/ 11:20:28 (QP5 v5.391) */
+declare
+  procedure p_ins_status (
+    p_i_refcode      in wksp_evp.evp_vehicle_request_status.ref_code%type
+   ,p_i_status_name  in wksp_evp.evp_vehicle_request_status.status_name%type
+   ,p_i_desc         in wksp_evp.evp_vehicle_request_status.description%type
+   ,p_i_color        in wksp_evp.evp_vehicle_request_status.color_code%type
+   ,p_i_start        in wksp_evp.evp_vehicle_request_status.ind_start%type
+   ,p_i_end          in wksp_evp.evp_vehicle_request_status.ind_end%type)
+  is
+    v_id  number;
+  begin
+    select max (id)
+      into v_id
+      from wksp_evp.evp_vehicle_request_status
+     where ref_code = p_i_refcode;
+
+    if v_id is null
+    then
+      insert into wksp_evp.evp_vehicle_request_status (
+                    ref_code
+                   ,status_name
+                   ,description
+                   ,ind_start
+                   ,ind_end
+                   ,color_code)
+           values (
+                    p_i_refcode
+                   ,p_i_status_name
+                   ,p_i_desc
+                   ,p_i_start
+                   ,p_i_end
+                   ,p_i_color);
+    else
+      update wksp_evp.evp_vehicle_request_status
+         set ref_code = p_i_refcode
+            ,status_name = p_i_status_name
+            ,description = p_i_desc
+            ,ind_start = p_i_start
+            ,ind_end = p_i_end
+            ,color_code = p_i_color
+       where id = v_id;
+    end if;
+  end;
+  procedure p_ins_status_trans (
+    p_i_refcode_from    in wksp_evp.evp_vehicle_request_status.ref_code%type
+   ,p_i_refcode_to      in wksp_evp.evp_vehicle_request_status.ref_code%type)
+  is
+    v_id  number;
+    v_status_from_id  number;
+    v_status_to_id  number;
+  begin
+  
+    select id
+      into v_status_from_id
+      from wksp_evp.evp_vehicle_request_status
+     where ref_code = p_i_refcode_from;
+     
+    select id
+      into v_status_to_id
+      from wksp_evp.evp_vehicle_request_status
+     where ref_code = p_i_refcode_to;    
+    
+    select max (id)
+      into v_id
+      from wksp_evp.evp_ver_status_translation
+     where status_id_from = v_status_from_id
+       and status_id_to = v_status_to_id;
+
+    if v_id is null
+    then
+      insert into wksp_evp.evp_ver_status_translation (
+                    status_id_from
+                   ,status_id_to)
+           values (
+                    v_status_from_id
+                   ,v_status_to_id);
+    else
+      null;
+    end if;
+  end;
+begin
+
+  p_ins_status (p_i_color => 'apex-cal-blue', p_i_refcode => 'SKICA', p_i_status_name => 'SKICA', p_i_desc => 'Zahtjev je tek snimljen od strane korisnika' , p_i_start => 1 ,p_i_end => 0);
+  p_ins_status (p_i_color => 'apex-cal-yellow', p_i_refcode => 'OTVOREN', p_i_status_name => 'OTVOREN', p_i_desc => 'Korisnik otvara zahtjev za vozilom prema administratoru vozila', p_i_start => 0, p_i_end => 0);
+  p_ins_status (p_i_color => 'apex-cal-gray', p_i_refcode => 'PONISTEN', p_i_status_name => 'PONIŠTEN', p_i_desc => 'Korisnik je odustao od zahtjeva', p_i_start => 0, p_i_end => 0);
+  p_ins_status (p_i_color => 'apex-cal-green', p_i_refcode => 'REZERVIRAN', p_i_status_name => 'REZERVIRAN', p_i_desc => 'Administrator je odobiro zahtjev za vozilom', p_i_start => 0, p_i_end => 0);
+  p_ins_status (p_i_color => 'apex-cal-black', p_i_refcode => 'ODBIJEN', p_i_status_name => 'ODBIJEN', p_i_desc => 'Administrator je odbio zahtjev', p_i_start => 0, p_i_end => 0);
+  p_ins_status (p_i_color => 'apex-cal-orange', p_i_refcode => 'U_DORADI', p_i_status_name => 'U DORADI', p_i_desc => 'Zahtjev treba doradu te ga administratir vraca korisniku', p_i_start => 0, p_i_end => 0);
+  p_ins_status (p_i_color => 'apex-cal-gray', p_i_refcode => 'STORNO', p_i_status_name => 'STORNO', p_i_desc => 'Administrator je stornirao zahtjev', p_i_start => 0, p_i_end => 0);
+  p_ins_status (p_i_color => 'apex-cal-gray', p_i_refcode => 'NEAKTIVAN', p_i_status_name => 'NEAKTIVAN', p_i_desc => 'Sustav prebaciju ne realizirane zatjeve u ovaj status', p_i_start => 0, p_i_end => 1);
+  
+  p_ins_status_trans (p_i_refcode_from => 'SKICA', p_i_refcode_to => 'OTVOREN');
+  p_ins_status_trans (p_i_refcode_from => 'OTVOREN', p_i_refcode_to => 'REZERVIRAN');
+  p_ins_status_trans (p_i_refcode_from => 'OTVOREN', p_i_refcode_to => 'ODBIJEN');
+  p_ins_status_trans (p_i_refcode_from => 'OTVOREN', p_i_refcode_to => 'PONISTEN');
+  p_ins_status_trans (p_i_refcode_from => 'OTVOREN', p_i_refcode_to => 'U_DORADI');
+  p_ins_status_trans (p_i_refcode_from => 'OTVOREN', p_i_refcode_to => 'NEAKTIVAN');
+  p_ins_status_trans (p_i_refcode_from => 'REZERVIRAN', p_i_refcode_to => 'STORNO');
+  p_ins_status_trans (p_i_refcode_from => 'U_DORADI', p_i_refcode_to => 'OTVOREN');
+  p_ins_status_trans (p_i_refcode_from => 'U_DORADI', p_i_refcode_to => 'NEAKTIVAN');
+  
+  commit;
+exception
+  when others
+  then
+    rollback;
+    raise;
+end;
+
+/
+
+BEGIN
+  SYS.DBMS_SCHEDULER.CREATE_JOB
+    (
+       job_name        => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+      ,start_date      => TO_TIMESTAMP_TZ('2024/05/29 18:46:47.930682 UTC','yyyy/mm/dd hh24:mi:ss.ff tzr')
+      ,repeat_interval => 'FREQ=HOURLY;INTERVAL=1;BYMINUTE=0;BYSECOND=0'
+      ,end_date        => NULL
+      ,job_class       => 'DEFAULT_JOB_CLASS'
+      ,job_type        => 'PLSQL_BLOCK'
+      ,job_action      => 'begin
+  wksp_evp.evp_vehicle_request_pkg.p_deactive_requests;
+  commit;
+exception
+  when others
+  then
+    rollback;
+    raise;
+end;'
+      ,comments        => 'Job deactives vehicle requests that are inactive and 24 hours from travel start date has passed.'
+    );
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'RESTARTABLE'
+     ,value     => FALSE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'LOGGING_LEVEL'
+     ,value     => SYS.DBMS_SCHEDULER.LOGGING_OFF);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE_NULL
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'MAX_FAILURES');
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE_NULL
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'MAX_RUNS');
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'STOP_ON_WINDOW_CLOSE'
+     ,value     => FALSE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'JOB_PRIORITY'
+     ,value     => 3);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE_NULL
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'SCHEDULE_LIMIT');
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'AUTO_DROP'
+     ,value     => FALSE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'RESTART_ON_RECOVERY'
+     ,value     => FALSE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'RESTART_ON_FAILURE'
+     ,value     => FALSE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB'
+     ,attribute => 'STORE_OUTPUT'
+     ,value     => TRUE);
+
+  SYS.DBMS_SCHEDULER.ENABLE
+    (name                  => 'WKSP_EVP.DEACTIVE_REQUESTS_JOB');
+END;
+/
+
+-- DDL wksp_evp.evp_technical_inspection
+alter table wksp_evp.evp_technical_inspection
+  add DATE_OF_INSPECTION date not null;
+
+comment on column wksp_evp.evp_technical_inspection.date_of_inspection is
+  'Date of vehicle technical inspection';
+  
+/
+
+-- DDL  
+CREATE TABLE wksp_evp.evp_vehicle_insurance (
+    id             NUMBER NOT NULL,
+    valid_from     DATE NOT NULL,
+    valid_to       DATE NOT NULL,
+    vehicle_id     NUMBER NOT NULL,
+    insurance_date DATE NOT NULL,
+    user_crated    VARCHAR2(50 CHAR) NOT NULL,
+    date_crated    DATE NOT NULL,
+    user_updated   VARCHAR2(50 CHAR),
+    date_updated   DATE
+);
+
+COMMENT ON TABLE wksp_evp.evp_vehicle_insurance IS
+    'Vehicle registration';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.id IS
+    'Vehicle insurance ID';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.valid_from IS
+    'Insurance valid from';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.valid_to IS
+    'Insurance valid to';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.vehicle_id IS
+    'Vehicle FK';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.insurance_date IS
+    'Insurance date';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.user_crated IS
+    'App user created';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.date_crated IS
+    'Created date';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.user_updated IS
+    'App user updated';
+
+COMMENT ON COLUMN wksp_evp.evp_vehicle_insurance.date_updated IS
+    'Updated date';
+
+CREATE INDEX wksp_evp.evp_vei_vehicle_id_idx ON
+    wksp_evp.evp_vehicle_insurance (
+        vehicle_id
+    ASC );
+
+ALTER TABLE wksp_evp.evp_vehicle_insurance ADD CONSTRAINT evp_vehicle_insurance_pk PRIMARY KEY ( id );
+
+ALTER TABLE wksp_evp.evp_vehicle_insurance
+    ADD CONSTRAINT evp_vei_evp_vehicle_fk FOREIGN KEY ( vehicle_id )
+        REFERENCES wksp_evp.evp_vehicle ( id );
+        
+create or replace trigger wksp_evp.evp_trg_vei_biu
+  before insert or update
+  on wksp_evp.evp_vehicle_insurance
+  referencing new as new old as old
+  for each row
+declare
+  v_err            varchar2 (1000);
+  v_radnja_oznaka  varchar2 (10);
+  v_mode           varchar2 (1);
+  greska           exception;
+begin
+  if inserting
+  then
+    v_mode := 'I';
+  elsif updating
+  then
+    v_mode := 'U';
+  else
+    v_mode := 'D';
+  end if;
+
+
+  if inserting
+  then
+    /* insert */
+    v_radnja_oznaka := 'INS';
+
+    if :new.id is null
+    then
+      :new.id := wksp_evp.evp_seq.nextval ();
+    end if;
+    
+    :new.user_crated := nvl (v ('APP_USER'), user);
+    :new.date_crated := sysdate;
+  elsif updating
+  then
+    /* update */
+    v_radnja_oznaka := 'UPD';
+    
+    :new.user_updated := nvl (v ('APP_USER'), user);
+    :new.date_updated := sysdate;
+  else
+    /* delete */
+    v_radnja_oznaka := 'DEL';
+  end if;
+
+  if v_err is not null
+  then
+    raise greska;
+  end if;
+exception
+  when others
+  then
+    raise_application_error (-20001, sqlerrm);
+end;       
+
+/
+
+--JOB WKSP_EVP.SEND_SYS_NOTIFICATIONS
+BEGIN
+  SYS.DBMS_SCHEDULER.DROP_JOB
+    (job_name  => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS');
+END;
+/
+
+BEGIN
+  SYS.DBMS_SCHEDULER.CREATE_JOB
+    (
+       job_name        => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+      ,start_date      => TO_TIMESTAMP_TZ('2024/06/17 20:47:52.463757 UTC','yyyy/mm/dd hh24:mi:ss.ff tzr')
+      ,repeat_interval => 'FREQ=DAILY;BYHOUR=7'
+      ,end_date        => NULL
+      ,job_class       => 'DEFAULT_JOB_CLASS'
+      ,job_type        => 'PLSQL_BLOCK'
+      ,job_action      => 'begin
+  wksp_evp.evp_notification_pkg.p_send_system_notifications;
+  commit;
+exception
+  when others
+  then
+    rollback;
+    raise;
+end;'
+      ,comments        => 'Sent notifications important to vehicle administrator'
+    );
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'RESTARTABLE'
+     ,value     => TRUE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'LOGGING_LEVEL'
+     ,value     => SYS.DBMS_SCHEDULER.LOGGING_OFF);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE_NULL
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'MAX_FAILURES');
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE_NULL
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'MAX_RUNS');
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'STOP_ON_WINDOW_CLOSE'
+     ,value     => FALSE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'JOB_PRIORITY'
+     ,value     => 3);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE_NULL
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'SCHEDULE_LIMIT');
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'AUTO_DROP'
+     ,value     => FALSE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'RESTART_ON_RECOVERY'
+     ,value     => TRUE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'RESTART_ON_FAILURE'
+     ,value     => TRUE);
+  SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS'
+     ,attribute => 'STORE_OUTPUT'
+     ,value     => TRUE);
+
+  SYS.DBMS_SCHEDULER.ENABLE
+    (name                  => 'WKSP_EVP.SEND_SYS_NOTIFICATIONS');
+END;
+/

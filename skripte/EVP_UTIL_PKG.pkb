@@ -65,5 +65,41 @@ as
     then
       return null;
   end f_get_vehicle_last_consumption;
+  
+    --Return: employee name
+  function f_get_emp_name (p_i_emp_id in wksp_evp.evp_employee.id%type)
+    return varchar2
+  is
+    v_ret  varchar2(500 char);
+  begin
+    select name || ' ' || lastname
+      into v_ret
+      from wksp_evp.evp_employee
+     where id = p_i_emp_id;
+
+    return v_ret;
+  exception
+    when others
+    then
+      return null;
+  end f_get_emp_name;
+  
+      --Return: employee OIB
+  function f_get_emp_oib (p_i_emp_id in wksp_evp.evp_employee.id%type)
+    return varchar2
+  is
+    v_ret  wksp_evp.evp_employee.oib%type;
+  begin
+    select OIB
+      into v_ret
+      from wksp_evp.evp_employee
+     where id = p_i_emp_id;
+
+    return v_ret;
+  exception
+    when others
+    then
+      return null;
+  end f_get_emp_oib;
 end evp_util_pkg;
 /
