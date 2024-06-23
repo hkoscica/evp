@@ -1,5 +1,5 @@
-# EVP
-Web aplikacija napravljena za potrebe predmeta na studiju.
+# EVP - Evidencija voznog parka
+Mrežna aplikacija napravljena za potrebe studija.
 Podaci korišteni u aplikaciju su generirani pseudo slučajnim generatorom i nemaju veze s pravim osobama i vozilima. Fotografije vozila preuzete su sa pixabay.com stranice.
 
 ![image](https://github.com/hkoscica/evp/assets/147255672/3cbb781c-d370-4e4b-8a4b-0f59fd0dc513)
